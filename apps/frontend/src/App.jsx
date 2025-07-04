@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import './App.css';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
+import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import ClientDashboard from './pages/ClientDashboard';
@@ -36,6 +37,9 @@ const Router = () => {
   switch (currentPath) {
     case '/login':
       return <Login />;
+    
+    case '/register':
+      return <Register />;
     
     case '/admin':
       return <AdminDashboard />;

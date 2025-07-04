@@ -1,15 +1,20 @@
 from fastapi import FastAPI, HTTPException, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from typing import List
+
+from database import get_db, create_tables
+from models import User
 from auth import (
-    LoginRequest, LoginResponse, UserProfile,
-    authenticate_user, create_access_token, get_current_user,
-    verify_role, verify_roles
+    LoginRequest, RegisterRequest, LoginResponse, UserProfile, UserCreate,
+    authenticate_user, create_access_token, get_current_user, create_user,
+    verify_admin, get_user_by_email
 )
 
 app = FastAPI(
     title="ORBIT IA Backend", 
     version="1.0.0",
-    description="Backend da plataforma ORBIT IA com autenticação JWT e controle de acesso por perfis"
+    description="Backend da plataforma ORBIT IA com autenticação JWT e PostgreSQL"
 )
 
 # Configurar CORS para permitir requisições do frontend
@@ -21,6 +26,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Criar tabelas na inicialização (em produção, usar migrations)
+@app.on_event("startup")
+async def startup_event():
+    create_tables()
+
 @app.get("/")
 async def root():
     return {"message": "ORBIT IA Backend está online"}
@@ -30,11 +40,11 @@ async def health_check():
     return {"status": "ok"}
 
 @app.post("/api/login", response_model=LoginResponse)
-async def login(login_data: LoginRequest):
+async def login(login_data: LoginRequest, db: Session = Depends(get_db)):
     """
     Endpoint de login que autentica usuário e retorna token JWT
     """
-    user = authenticate_user(login_data.email, login_data.password)
+    user = authenticate_user(db, login_data.email, login_data.password)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -43,124 +53,120 @@ async def login(login_data: LoginRequest):
         )
     
     # Criar token JWT
-    access_token = create_access_token(data={"sub": user["email"], "role": user["role"]})
+    access_token = create_access_token(data={"sub": user.email, "role": user.role})
     
     return LoginResponse(
         token=access_token,
-        role=user["role"],
+        role=user.role,
         user={
-            "email": user["email"],
-            "name": user["name"],
-            "role": user["role"],
-            "created_at": user["created_at"]
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "created_at": user.created_at.isoformat() if user.created_at else None
         }
     )
 
-@app.get("/api/user/profile", response_model=UserProfile)
-async def get_user_profile(current_user: dict = Depends(get_current_user)):
+@app.post("/api/user/register", status_code=status.HTTP_201_CREATED)
+async def register_user(user_data: RegisterRequest, db: Session = Depends(get_db)):
     """
-    Endpoint protegido que retorna o perfil do usuário autenticado
+    Endpoint para criar novo usuário (temporário para desenvolvimento)
+    """
+    user_create = UserCreate(
+        email=user_data.email,
+        name=user_data.name,
+        role=user_data.role,
+        password=user_data.password
+    )
+    
+    try:
+        user = create_user(db, user_create)
+        return {
+            "message": "Usuário criado com sucesso",
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": user.name,
+                "role": user.role
+            }
+        }
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erro interno do servidor"
+        )
+
+@app.get("/api/user/profile", response_model=UserProfile)
+async def get_user_profile(current_user: User = Depends(get_current_user)):
+    """
+    Endpoint para obter perfil do usuário autenticado
     """
     return UserProfile(
-        email=current_user["email"],
-        name=current_user["name"],
-        role=current_user["role"],
-        created_at=current_user["created_at"]
+        id=current_user.id,
+        email=current_user.email,
+        name=current_user.name,
+        role=current_user.role,
+        is_active=current_user.is_active,
+        created_at=current_user.created_at
     )
 
 @app.get("/api/admin/dashboard")
-async def admin_dashboard(current_user: dict = Depends(verify_role("admin"))):
+async def admin_dashboard(admin_user: User = Depends(verify_admin), db: Session = Depends(get_db)):
     """
-    Endpoint exclusivo para administradores
+    Endpoint do dashboard administrativo (apenas para admins)
     """
-    return {
-        "message": f"Bem-vindo ao painel administrativo, {current_user['name']}!",
-        "data": {
-            "total_users": 4,
-            "active_sessions": 12,
-            "system_status": "online",
-            "last_backup": "2024-07-04T20:00:00Z"
+    # Buscar estatísticas do sistema
+    total_users = db.query(User).count()
+    active_users = db.query(User).filter(User.is_active == True).count()
+    
+    # Buscar lista de usuários
+    users = db.query(User).all()
+    users_list = [
+        {
+            "id": user.id,
+            "email": user.email,
+            "name": user.name,
+            "role": user.role,
+            "is_active": user.is_active,
+            "created_at": user.created_at.isoformat() if user.created_at else None
         }
+        for user in users
+    ]
+    
+    return {
+        "stats": {
+            "total_users": total_users,
+            "active_users": active_users,
+            "active_sessions": 12,  # Mock data
+            "system_status": "Online",
+            "last_backup": "04/07/2024"
+        },
+        "users": users_list
     }
 
 @app.get("/api/client/dashboard")
-async def client_dashboard(current_user: dict = Depends(verify_role("client"))):
+async def client_dashboard(current_user: User = Depends(get_current_user)):
     """
-    Endpoint exclusivo para clientes
+    Endpoint do dashboard do cliente
     """
-    return {
-        "message": f"Bem-vindo ao seu painel, {current_user['name']}!",
-        "data": {
-            "active_projects": 3,
-            "pending_tasks": 7,
-            "completed_tasks": 25,
-            "next_meeting": "2024-07-05T14:00:00Z"
-        }
-    }
-
-@app.get("/api/partner/dashboard")
-async def partner_dashboard(current_user: dict = Depends(verify_role("partner"))):
-    """
-    Endpoint exclusivo para parceiros
-    """
-    return {
-        "message": f"Bem-vindo ao portal de parceiros, {current_user['name']}!",
-        "data": {
-            "active_partnerships": 5,
-            "revenue_share": "R$ 15.750,00",
-            "pending_approvals": 2,
-            "performance_score": 94.5
-        }
-    }
-
-@app.get("/api/backoffice/dashboard")
-async def backoffice_dashboard(current_user: dict = Depends(verify_role("backoffice"))):
-    """
-    Endpoint exclusivo para equipe de backoffice
-    """
-    return {
-        "message": f"Bem-vindo ao backoffice, {current_user['name']}!",
-        "data": {
-            "pending_tickets": 8,
-            "resolved_today": 15,
-            "escalated_issues": 2,
-            "team_performance": "98.2%"
-        }
-    }
-
-@app.get("/api/protected/multi-role")
-async def multi_role_endpoint(current_user: dict = Depends(verify_roles(["admin", "backoffice"]))):
-    """
-    Endpoint acessível por múltiplos perfis (admin e backoffice)
-    """
-    return {
-        "message": f"Acesso autorizado para {current_user['name']} ({current_user['role']})",
-        "data": {
-            "shared_resources": ["reports", "analytics", "user_management"],
-            "access_level": "elevated"
-        }
-    }
-
-@app.get("/api/users/list")
-async def list_users(current_user: dict = Depends(verify_roles(["admin", "backoffice"]))):
-    """
-    Lista usuários (apenas admin e backoffice)
-    """
-    from auth import USERS_DB
-    
-    users_list = []
-    for email, user_data in USERS_DB.items():
-        users_list.append({
-            "email": email,
-            "name": user_data["name"],
-            "role": user_data["role"],
-            "created_at": user_data["created_at"]
-        })
+    if current_user.role != "client":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado. Apenas clientes."
+        )
     
     return {
-        "users": users_list,
-        "total": len(users_list),
-        "requested_by": current_user["name"]
+        "message": f"Dashboard do cliente {current_user.name}",
+        "projects": [
+            {"id": 1, "name": "Projeto Alpha", "status": "Em andamento"},
+            {"id": 2, "name": "Projeto Beta", "status": "Concluído"}
+        ],
+        "recent_activity": [
+            {"action": "Upload de documento", "date": "2024-07-04"},
+            {"action": "Análise concluída", "date": "2024-07-03"}
+        ]
     }
 
 if __name__ == "__main__":

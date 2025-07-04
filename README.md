@@ -8,7 +8,7 @@ Bem-vindo ao **ORBIT IA**, um monorepositório moderno e escalável para desenvo
 orbit/
 ├── apps/                    # Aplicações principais
 │   ├── frontend/           # Aplicação frontend (React + Vite)
-│   └── backend/            # Aplicação backend (FastAPI)
+│   └── backend/            # Aplicação backend (FastAPI + PostgreSQL)
 ├── packages/               # Pacotes compartilhados
 ├── .github/workflows/      # Workflows de CI/CD
 ├── docker-compose.yml      # Configuração dos serviços
@@ -23,7 +23,8 @@ orbit/
 O ORBIT IA é um sistema completo que integra:
 
 - **Frontend**: Interface de usuário moderna e responsiva (React + Tailwind CSS)
-- **Backend**: API robusta e escalável (FastAPI + Python)
+- **Backend**: API robusta e escalável (FastAPI + Python + PostgreSQL)
+- **Autenticação**: Sistema JWT com perfis de usuário (admin, cliente, parceiro, backoffice)
 - **Banco de Dados**: PostgreSQL para persistência de dados
 - **Cache**: Redis para cache e sessões
 - **Packages**: Bibliotecas e utilitários compartilhados
@@ -33,13 +34,17 @@ O ORBIT IA é um sistema completo que integra:
 ### Frontend
 - **React 18** com Vite
 - **Tailwind CSS** para estilização
-- **shadcn/ui** para componentes
+- **Context API** para gerenciamento de estado
 - **Lucide Icons** para ícones
 
 ### Backend
 - **FastAPI** (Python)
+- **SQLAlchemy** para ORM
+- **Alembic** para migrations
+- **PostgreSQL** como banco de dados
+- **JWT** para autenticação
+- **bcrypt** para hash de senhas
 - **Uvicorn** como servidor ASGI
-- **Pydantic** para validação de dados
 
 ### Infraestrutura
 - **PostgreSQL 15** como banco de dados
@@ -49,97 +54,166 @@ O ORBIT IA é um sistema completo que integra:
 ## 📋 Pré-requisitos
 
 - **Docker** e **Docker Compose**
-- **Git**
+- **Node.js 18+** (para desenvolvimento local)
+- **Python 3.11+** (para desenvolvimento local)
+- **PostgreSQL 15+** (para desenvolvimento local)
 
 ## 🚀 Início Rápido
 
-### 1. Clone o repositório
+### 1. Clonar o repositório
 ```bash
-git clone https://github.com/videbian/orbit.git
-cd orbit
+git clone https://github.com/videbian/ORBIT.git
+cd ORBIT
 ```
 
-### 2. Configure as variáveis de ambiente
+### 2. Configurar variáveis de ambiente
 ```bash
 cp .env.example .env
+# Editar .env com suas configurações
 ```
 
-### 3. Inicie todos os serviços
+### 3. Iniciar com Docker Compose
 ```bash
 docker-compose up --build
 ```
 
-### 4. Acesse as aplicações
+### 4. Acessar as aplicações
 - **Frontend**: http://localhost:3000
-- **Backend API**: http://localhost:8000
-- **Documentação da API**: http://localhost:8000/docs
-- **PostgreSQL**: localhost:5432
-- **Redis**: localhost:6379
+- **Backend**: http://localhost:8000
+- **API Docs**: http://localhost:8000/docs
 
-## 🔍 Endpoints Disponíveis
+## 🔐 Sistema de Autenticação
 
-### Backend (FastAPI)
-- `GET /` - Página inicial da API
-- `GET /api/health` - Health check (retorna `{"status": "ok"}`)
-- `GET /docs` - Documentação interativa da API (Swagger)
+### Perfis de Usuário
+- **admin**: Administrador do sistema
+- **client**: Cliente da plataforma
+- **partner**: Parceiro estratégico
+- **backoffice**: Operador de backoffice
 
-## 🐳 Comandos Docker
+### Endpoints de Autenticação
+- `POST /api/login` - Login com email e senha
+- `POST /api/user/register` - Registro de novo usuário
+- `GET /api/user/profile` - Perfil do usuário autenticado
 
-```bash
-# Iniciar todos os serviços
-docker-compose up --build
+### Usuários de Demonstração
+Para testes, você pode criar usuários com os seguintes dados:
 
-# Iniciar em background
-docker-compose up -d --build
-
-# Parar todos os serviços
-docker-compose down
-
-# Ver logs de um serviço específico
-docker-compose logs frontend
-docker-compose logs backend
-
-# Reconstruir apenas um serviço
-docker-compose build backend
-docker-compose up backend
-
-# Limpar volumes (cuidado: remove dados do banco)
-docker-compose down -v
+```json
+{
+  "email": "admin@orbit.com",
+  "password": "admin123",
+  "name": "Administrador ORBIT",
+  "role": "admin"
+}
 ```
 
-## 📦 Estrutura de Desenvolvimento
+## 🗄️ Banco de Dados
 
-### Apps
-- **frontend/**: Aplicação React com Vite
-  - Porta: 3000
-  - Hot reload habilitado
-- **backend/**: API FastAPI
-  - Porta: 8000
-  - Auto-reload habilitado
-
-### Serviços
-- **PostgreSQL**: Banco de dados principal
-- **Redis**: Cache e sessões
-
-## 🔧 Scripts de Desenvolvimento
-
-### Frontend
+### Configuração Local
 ```bash
-cd apps/frontend
-pnpm install
-pnpm run dev
+# Instalar PostgreSQL
+sudo apt install postgresql postgresql-contrib
+
+# Criar banco e usuário
+sudo -u postgres psql
+CREATE DATABASE orbit;
+CREATE USER orbit WITH PASSWORD 'orbit';
+GRANT ALL PRIVILEGES ON DATABASE orbit TO orbit;
+\q
 ```
+
+### Migrations
+```bash
+cd apps/backend
+
+# Criar nova migration
+alembic revision --autogenerate -m "descrição da mudança"
+
+# Aplicar migrations
+alembic upgrade head
+
+# Verificar histórico
+alembic history
+```
+
+## 🧪 Desenvolvimento Local
 
 ### Backend
 ```bash
 cd apps/backend
+
+# Instalar dependências
 pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+
+# Configurar variáveis de ambiente
+export DATABASE_URL="postgresql://orbit:orbit@localhost:5432/orbit"
+export JWT_SECRET="orbit-ia-secret-key-2024"
+
+# Executar migrations
+alembic upgrade head
+
+# Iniciar servidor
+python main.py
 ```
+
+### Frontend
+```bash
+cd apps/frontend
+
+# Instalar dependências
+npm install
+
+# Iniciar servidor de desenvolvimento
+npm run dev
+```
+
+## 🧪 Testes
+
+### Backend
+```bash
+cd apps/backend
+pytest
+```
+
+### Frontend
+```bash
+cd apps/frontend
+npm test
+```
+
+## 📦 Estrutura de Dados
+
+### Modelo User
+```sql
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR UNIQUE NOT NULL,
+    hashed_password VARCHAR NOT NULL,
+    name VARCHAR NOT NULL,
+    role VARCHAR NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE
+);
+```
+
+## 🔒 Segurança
+
+- Senhas são hasheadas com bcrypt
+- Tokens JWT com expiração de 2 horas
+- CORS configurado para desenvolvimento
+- Validação de dados com Pydantic
+- Proteção de rotas por perfil de usuário
+
+## 📚 Documentação da API
+
+A documentação interativa da API está disponível em:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
 
 ## 🤝 Contribuição
 
-1. Faça um fork do projeto
+1. Fork o projeto
 2. Crie uma branch para sua feature (`git checkout -b feature/AmazingFeature`)
 3. Commit suas mudanças (`git commit -m 'Add some AmazingFeature'`)
 4. Push para a branch (`git push origin feature/AmazingFeature`)
@@ -147,139 +221,15 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 ## 📄 Licença
 
-Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para mais detalhes.
+Este projeto está sob a licença MIT. Veja o arquivo `LICENSE` para mais detalhes.
 
-## 👥 Equipe
+## 📞 Suporte
 
-Desenvolvido com ❤️ pela equipe ORBIT IA.
+Para suporte, entre em contato:
+- **Email**: orbit@videbian.com
+- **GitHub Issues**: https://github.com/videbian/ORBIT/issues
 
 ---
 
-**Status**: ✅ Ambiente local configurado com Docker Compose
-
-
-
-## 🔐 Sistema de Autenticação
-
-O ORBIT IA implementa um sistema completo de autenticação baseado em JWT (JSON Web Tokens) com controle de acesso por perfis.
-
-### Perfis de Usuário
-
-O sistema suporta 4 tipos de perfis:
-
-| Perfil | Descrição | Acesso |
-|--------|-----------|--------|
-| **Admin** | Administrador do sistema | Acesso total, gerenciamento de usuários |
-| **Client** | Cliente da plataforma | Dashboard de projetos e tarefas |
-| **Partner** | Parceiro estratégico | Portal de parcerias e métricas |
-| **Backoffice** | Equipe de suporte | Ferramentas de backoffice e tickets |
-
-### Fluxo de Autenticação
-
-1. **Login**: Usuário fornece email e senha
-2. **Validação**: Backend verifica credenciais contra base de dados
-3. **Token JWT**: Sistema gera token com expiração de 2 horas
-4. **Armazenamento**: Token é salvo no localStorage do navegador
-5. **Autorização**: Cada requisição inclui token no header Authorization
-6. **Verificação**: Backend valida token e permissões para cada endpoint
-
-### Endpoints de Autenticação
-
-#### POST `/api/login`
-Autentica usuário e retorna token JWT.
-
-**Request:**
-```json
-{
-  "email": "usuario@orbit.com",
-  "password": "senha123"
-}
-```
-
-**Response:**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "role": "admin",
-  "user": {
-    "email": "admin@orbit.com",
-    "name": "Administrador ORBIT",
-    "role": "admin",
-    "created_at": "2024-01-01T00:00:00Z"
-  }
-}
-```
-
-#### GET `/api/user/profile`
-Retorna perfil do usuário autenticado.
-
-**Headers:**
-```
-Authorization: Bearer <token>
-```
-
-**Response:**
-```json
-{
-  "email": "admin@orbit.com",
-  "name": "Administrador ORBIT",
-  "role": "admin",
-  "created_at": "2024-01-01T00:00:00Z"
-}
-```
-
-### Usuários de Demonstração
-
-Para testes, o sistema inclui usuários pré-configurados:
-
-| Email | Senha | Perfil |
-|-------|-------|--------|
-| `admin@orbit.com` | `admin123` | Administrador |
-| `cliente@orbit.com` | `cliente123` | Cliente |
-| `parceiro@orbit.com` | `parceiro123` | Parceiro |
-| `backoffice@orbit.com` | `backoffice123` | Backoffice |
-
-### Proteção de Rotas
-
-#### Frontend
-- **AuthContext**: Gerencia estado global de autenticação
-- **PrivateRoute**: Componente para proteger rotas por perfil
-- **Redirecionamento**: Usuários não autenticados são redirecionados para `/login`
-
-#### Backend
-- **JWT Middleware**: Valida tokens em endpoints protegidos
-- **Role Verification**: Verifica permissões baseadas no perfil do usuário
-- **Decorators**: `@verify_role()` e `@verify_roles()` para controle de acesso
-
-### Configuração de Segurança
-
-As configurações de JWT estão no arquivo `.env`:
-
-```env
-JWT_SECRET=orbit-ia-secret-key-2024-change-in-production
-JWT_ALGORITHM=HS256
-JWT_EXPIRATION_HOURS=2
-```
-
-⚠️ **Importante**: Em produção, altere o `JWT_SECRET` para uma chave segura e única.
-
-### Rotas Protegidas por Perfil
-
-| Rota | Perfil Necessário | Descrição |
-|------|------------------|-----------|
-| `/admin` | admin | Painel administrativo |
-| `/cliente` | client | Dashboard do cliente |
-| `/parceiro` | partner | Portal do parceiro |
-| `/backoffice` | backoffice | Ferramentas de backoffice |
-| `/api/admin/*` | admin | Endpoints administrativos |
-| `/api/client/*` | client | Endpoints do cliente |
-| `/api/partner/*` | partner | Endpoints do parceiro |
-| `/api/backoffice/*` | backoffice | Endpoints do backoffice |
-
-### Logout e Segurança
-
-- **Logout**: Remove token do localStorage e redireciona para login
-- **Expiração**: Tokens expiram automaticamente em 2 horas
-- **Validação**: Tokens inválidos ou expirados resultam em logout automático
-- **CORS**: Configurado para permitir requisições do frontend
+**ORBIT IA** - Transformando dados em inteligência 🚀
 
