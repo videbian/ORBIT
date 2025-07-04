@@ -1,16 +1,18 @@
-# 🚀 ORBIT - Monorepositório
+# 🚀 ORBIT IA - Monorepositório
 
-Bem-vindo ao **ORBIT**, um monorepositório moderno e escalável para desenvolvimento de aplicações full-stack.
+Bem-vindo ao **ORBIT IA**, um monorepositório moderno e escalável para desenvolvimento de aplicações full-stack com inteligência artificial.
 
 ## 📁 Estrutura do Projeto
 
 ```
 orbit/
 ├── apps/                    # Aplicações principais
-│   ├── frontend/           # Aplicação frontend
-│   └── backend/            # Aplicação backend
+│   ├── frontend/           # Aplicação frontend (React + Vite)
+│   └── backend/            # Aplicação backend (FastAPI)
 ├── packages/               # Pacotes compartilhados
 ├── .github/workflows/      # Workflows de CI/CD
+├── docker-compose.yml      # Configuração dos serviços
+├── .env.example           # Variáveis de ambiente de exemplo
 ├── README.md              # Este arquivo
 ├── .gitignore             # Arquivos ignorados pelo Git
 └── .editorconfig          # Configurações do editor
@@ -18,69 +20,121 @@ orbit/
 
 ## 🎯 Sobre o Projeto
 
-O ORBIT é um sistema completo que integra:
+O ORBIT IA é um sistema completo que integra:
 
-- **Frontend**: Interface de usuário moderna e responsiva
-- **Backend**: API robusta e escalável
+- **Frontend**: Interface de usuário moderna e responsiva (React + Tailwind CSS)
+- **Backend**: API robusta e escalável (FastAPI + Python)
+- **Banco de Dados**: PostgreSQL para persistência de dados
+- **Cache**: Redis para cache e sessões
 - **Packages**: Bibliotecas e utilitários compartilhados
 
 ## 🛠️ Tecnologias
 
-Este monorepositório está preparado para suportar:
+### Frontend
+- **React 18** com Vite
+- **Tailwind CSS** para estilização
+- **shadcn/ui** para componentes
+- **Lucide Icons** para ícones
 
-- **Frontend**: React, Next.js, TypeScript
-- **Backend**: Node.js, Express, TypeScript
-- **Banco de Dados**: PostgreSQL, MongoDB
-- **DevOps**: Docker, GitHub Actions
-- **Ferramentas**: ESLint, Prettier, Jest
+### Backend
+- **FastAPI** (Python)
+- **Uvicorn** como servidor ASGI
+- **Pydantic** para validação de dados
+
+### Infraestrutura
+- **PostgreSQL 15** como banco de dados
+- **Redis 7** para cache
+- **Docker & Docker Compose** para containerização
 
 ## 📋 Pré-requisitos
 
-- Node.js (versão 18 ou superior)
-- npm ou yarn
-- Git
+- **Docker** e **Docker Compose**
+- **Git**
 
 ## 🚀 Início Rápido
 
+### 1. Clone o repositório
 ```bash
-# Clone o repositório
 git clone https://github.com/videbian/orbit.git
-
-# Entre no diretório
 cd orbit
-
-# Instale as dependências (quando disponível)
-npm install
-
-# Execute o projeto (quando disponível)
-npm run dev
 ```
 
-## 📦 Estrutura de Pacotes
+### 2. Configure as variáveis de ambiente
+```bash
+cp .env.example .env
+```
 
-### Apps
-- **frontend/**: Aplicação cliente (React/Next.js)
-- **backend/**: Servidor API (Node.js/Express)
+### 3. Inicie todos os serviços
+```bash
+docker-compose up --build
+```
 
-### Packages
-- Bibliotecas compartilhadas entre as aplicações
-- Utilitários comuns
-- Configurações compartilhadas
+### 4. Acesse as aplicações
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8000
+- **Documentação da API**: http://localhost:8000/docs
+- **PostgreSQL**: localhost:5432
+- **Redis**: localhost:6379
 
-## 🔧 Scripts Disponíveis
+## 🔍 Endpoints Disponíveis
+
+### Backend (FastAPI)
+- `GET /` - Página inicial da API
+- `GET /api/health` - Health check (retorna `{"status": "ok"}`)
+- `GET /docs` - Documentação interativa da API (Swagger)
+
+## 🐳 Comandos Docker
 
 ```bash
-# Desenvolvimento
-npm run dev          # Inicia todos os serviços em modo desenvolvimento
+# Iniciar todos os serviços
+docker-compose up --build
 
-# Build
-npm run build        # Constrói todas as aplicações
+# Iniciar em background
+docker-compose up -d --build
 
-# Testes
-npm run test         # Executa todos os testes
+# Parar todos os serviços
+docker-compose down
 
-# Linting
-npm run lint         # Verifica qualidade do código
+# Ver logs de um serviço específico
+docker-compose logs frontend
+docker-compose logs backend
+
+# Reconstruir apenas um serviço
+docker-compose build backend
+docker-compose up backend
+
+# Limpar volumes (cuidado: remove dados do banco)
+docker-compose down -v
+```
+
+## 📦 Estrutura de Desenvolvimento
+
+### Apps
+- **frontend/**: Aplicação React com Vite
+  - Porta: 3000
+  - Hot reload habilitado
+- **backend/**: API FastAPI
+  - Porta: 8000
+  - Auto-reload habilitado
+
+### Serviços
+- **PostgreSQL**: Banco de dados principal
+- **Redis**: Cache e sessões
+
+## 🔧 Scripts de Desenvolvimento
+
+### Frontend
+```bash
+cd apps/frontend
+pnpm install
+pnpm run dev
+```
+
+### Backend
+```bash
+cd apps/backend
+pip install -r requirements.txt
+uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 ## 🤝 Contribuição
@@ -97,9 +151,9 @@ Este projeto está sob a licença MIT. Veja o arquivo [LICENSE](LICENSE) para ma
 
 ## 👥 Equipe
 
-Desenvolvido com ❤️ pela equipe ORBIT.
+Desenvolvido com ❤️ pela equipe ORBIT IA.
 
 ---
 
-**Status**: 🚧 Em desenvolvimento inicial - Estrutura base criada
+**Status**: ✅ Ambiente local configurado com Docker Compose
 
