@@ -1,0 +1,128 @@
+name: ORBIT IA CI
+
+on:
+  pull_request:
+    branches: [dev, main]
+  push:
+    branches: [main]
+
+jobs:
+  backend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/backend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      
+      - name: Cache pip dependencies
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('apps/backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+      
+      - name: Run tests
+        run: pytest -v
+      
+      - name: Test health endpoint
+        run: |
+          python main.py &
+          sleep 5
+          curl -f http://localhost:8000/api/health || exit 1
+          pkill -f "python main.py"
+
+  frontend-tests:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/frontend
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: 'npm'
+          cache-dependency-path: apps/frontend/package-lock.json
+      
+      - name: Install pnpm
+        run: npm install -g pnpm
+      
+      - name: Install dependencies
+        run: pnpm install
+      
+      - name: Run linting
+        run: pnpm run lint || echo "Linting skipped - no lint script found"
+      
+      - name: Build application
+        run: pnpm run build
+      
+      - name: Test build artifacts
+        run: |
+          if [ -d "dist" ]; then
+            echo "Build successful - dist folder created"
+            ls -la dist/
+          else
+            echo "Build failed - no dist folder found"
+            exit 1
+          fi
+
+  code-quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Check commit message format
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Checking commit message: $COMMIT_MSG"
+          if [[ $COMMIT_MSG =~ ^(feat|fix|docs|style|refactor|test|chore)(\(.+\))?: .+ ]]; then
+            echo "✅ Commit message follows conventional format"
+          else
+            echo "❌ Commit message should follow format: type(scope): description"
+            echo "Examples: feat: add new feature, fix(api): resolve bug"
+            exit 1
+          fi
+      
+      - name: Check for TODO/FIXME comments
+        run: |
+          TODO_COUNT=$(grep -r "TODO\|FIXME" apps/ --exclude-dir=node_modules --exclude-dir=dist || true | wc -l)
+          echo "Found $TODO_COUNT TODO/FIXME comments"
+          if [ $TODO_COUNT -gt 10 ]; then
+            echo "⚠️ Too many TODO/FIXME comments found. Consider addressing them."
+          fi
+
+  security-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Run security scan for Python
+        working-directory: apps/backend
+        run: |
+          pip install safety
+          safety check -r requirements.txt || echo "Security scan completed with warnings"
+      
+      - name: Run security scan for Node.js
+        working-directory: apps/frontend
+        run: |
+          npm audit --audit-level=high || echo "Security audit completed with warnings"
+

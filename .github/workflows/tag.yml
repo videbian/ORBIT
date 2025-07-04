@@ -1,0 +1,157 @@
+name: Semantic Tagging
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Get last tag
+        id: get_tag
+        run: |
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo 'v0.0.0')
+          echo "last_tag=$LAST_TAG" >> $GITHUB_OUTPUT
+          echo "Last tag found: $LAST_TAG"
+      
+      - name: Get commit messages since last tag
+        id: get_commits
+        run: |
+          LAST_TAG=${{ steps.get_tag.outputs.last_tag }}
+          if [ "$LAST_TAG" = "v0.0.0" ]; then
+            COMMITS=$(git log --pretty=format:"%s" HEAD)
+          else
+            COMMITS=$(git log --pretty=format:"%s" ${LAST_TAG}..HEAD)
+          fi
+          echo "commits<<EOF" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+      
+      - name: Determine version bump
+        id: bump
+        run: |
+          COMMITS="${{ steps.get_commits.outputs.commits }}"
+          LAST_TAG=${{ steps.get_tag.outputs.last_tag }}
+          
+          # Extract version numbers
+          if [ "$LAST_TAG" = "v0.0.0" ]; then
+            MAJOR=0
+            MINOR=0
+            PATCH=0
+          else
+            VERSION=${LAST_TAG#v}
+            MAJOR=$(echo $VERSION | cut -d. -f1)
+            MINOR=$(echo $VERSION | cut -d. -f2)
+            PATCH=$(echo $VERSION | cut -d. -f3)
+          fi
+          
+          echo "Current version: $MAJOR.$MINOR.$PATCH"
+          
+          # Determine bump type based on commit messages
+          BUMP_TYPE="patch"
+          
+          if echo "$COMMITS" | grep -q "BREAKING CHANGE\|!:"; then
+            BUMP_TYPE="major"
+          elif echo "$COMMITS" | grep -q "^feat"; then
+            BUMP_TYPE="minor"
+          elif echo "$COMMITS" | grep -q "^fix\|^perf"; then
+            BUMP_TYPE="patch"
+          else
+            echo "No version bump needed - no feat/fix/breaking changes found"
+            echo "should_tag=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # Calculate new version
+          case $BUMP_TYPE in
+            major)
+              NEW_MAJOR=$((MAJOR + 1))
+              NEW_MINOR=0
+              NEW_PATCH=0
+              ;;
+            minor)
+              NEW_MAJOR=$MAJOR
+              NEW_MINOR=$((MINOR + 1))
+              NEW_PATCH=0
+              ;;
+            patch)
+              NEW_MAJOR=$MAJOR
+              NEW_MINOR=$MINOR
+              NEW_PATCH=$((PATCH + 1))
+              ;;
+          esac
+          
+          NEW_TAG="v${NEW_MAJOR}.${NEW_MINOR}.${NEW_PATCH}"
+          
+          echo "Bump type: $BUMP_TYPE"
+          echo "New tag: $NEW_TAG"
+          echo "should_tag=true" >> $GITHUB_OUTPUT
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "bump_type=$BUMP_TYPE" >> $GITHUB_OUTPUT
+      
+      - name: Create and push tag
+        if: steps.bump.outputs.should_tag == 'true'
+        run: |
+          NEW_TAG=${{ steps.bump.outputs.new_tag }}
+          BUMP_TYPE=${{ steps.bump.outputs.bump_type }}
+          
+          # Create tag with message
+          git tag -a $NEW_TAG -m "chore(release): $NEW_TAG
+
+          Auto-generated $BUMP_TYPE version bump based on conventional commits.
+          
+          Changes since last release:
+          ${{ steps.get_commits.outputs.commits }}"
+          
+          # Push tag
+          git push origin $NEW_TAG
+          
+          echo "✅ Created and pushed tag: $NEW_TAG"
+      
+      - name: Create GitHub Release
+        if: steps.bump.outputs.should_tag == 'true'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ steps.bump.outputs.new_tag }}
+          release_name: Release ${{ steps.bump.outputs.new_tag }}
+          body: |
+            ## 🚀 ORBIT IA Release ${{ steps.bump.outputs.new_tag }}
+            
+            **Tipo de release:** ${{ steps.bump.outputs.bump_type }}
+            
+            ### 📝 Mudanças incluídas:
+            ${{ steps.get_commits.outputs.commits }}
+            
+            ### 🔗 Links úteis:
+            - [Documentação](https://github.com/videbian/ORBIT/blob/main/README.md)
+            - [Issues](https://github.com/videbian/ORBIT/issues)
+            - [Pull Requests](https://github.com/videbian/ORBIT/pulls)
+            
+            ---
+            
+            **Instalação:**
+            ```bash
+            git clone https://github.com/videbian/ORBIT.git
+            cd ORBIT
+            git checkout ${{ steps.bump.outputs.new_tag }}
+            docker-compose up --build
+            ```
+          draft: false
+          prerelease: false
+
