@@ -157,3 +157,129 @@ Desenvolvido com ❤️ pela equipe ORBIT IA.
 
 **Status**: ✅ Ambiente local configurado com Docker Compose
 
+
+
+## 🔐 Sistema de Autenticação
+
+O ORBIT IA implementa um sistema completo de autenticação baseado em JWT (JSON Web Tokens) com controle de acesso por perfis.
+
+### Perfis de Usuário
+
+O sistema suporta 4 tipos de perfis:
+
+| Perfil | Descrição | Acesso |
+|--------|-----------|--------|
+| **Admin** | Administrador do sistema | Acesso total, gerenciamento de usuários |
+| **Client** | Cliente da plataforma | Dashboard de projetos e tarefas |
+| **Partner** | Parceiro estratégico | Portal de parcerias e métricas |
+| **Backoffice** | Equipe de suporte | Ferramentas de backoffice e tickets |
+
+### Fluxo de Autenticação
+
+1. **Login**: Usuário fornece email e senha
+2. **Validação**: Backend verifica credenciais contra base de dados
+3. **Token JWT**: Sistema gera token com expiração de 2 horas
+4. **Armazenamento**: Token é salvo no localStorage do navegador
+5. **Autorização**: Cada requisição inclui token no header Authorization
+6. **Verificação**: Backend valida token e permissões para cada endpoint
+
+### Endpoints de Autenticação
+
+#### POST `/api/login`
+Autentica usuário e retorna token JWT.
+
+**Request:**
+```json
+{
+  "email": "usuario@orbit.com",
+  "password": "senha123"
+}
+```
+
+**Response:**
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "role": "admin",
+  "user": {
+    "email": "admin@orbit.com",
+    "name": "Administrador ORBIT",
+    "role": "admin",
+    "created_at": "2024-01-01T00:00:00Z"
+  }
+}
+```
+
+#### GET `/api/user/profile`
+Retorna perfil do usuário autenticado.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Response:**
+```json
+{
+  "email": "admin@orbit.com",
+  "name": "Administrador ORBIT",
+  "role": "admin",
+  "created_at": "2024-01-01T00:00:00Z"
+}
+```
+
+### Usuários de Demonstração
+
+Para testes, o sistema inclui usuários pré-configurados:
+
+| Email | Senha | Perfil |
+|-------|-------|--------|
+| `admin@orbit.com` | `admin123` | Administrador |
+| `cliente@orbit.com` | `cliente123` | Cliente |
+| `parceiro@orbit.com` | `parceiro123` | Parceiro |
+| `backoffice@orbit.com` | `backoffice123` | Backoffice |
+
+### Proteção de Rotas
+
+#### Frontend
+- **AuthContext**: Gerencia estado global de autenticação
+- **PrivateRoute**: Componente para proteger rotas por perfil
+- **Redirecionamento**: Usuários não autenticados são redirecionados para `/login`
+
+#### Backend
+- **JWT Middleware**: Valida tokens em endpoints protegidos
+- **Role Verification**: Verifica permissões baseadas no perfil do usuário
+- **Decorators**: `@verify_role()` e `@verify_roles()` para controle de acesso
+
+### Configuração de Segurança
+
+As configurações de JWT estão no arquivo `.env`:
+
+```env
+JWT_SECRET=orbit-ia-secret-key-2024-change-in-production
+JWT_ALGORITHM=HS256
+JWT_EXPIRATION_HOURS=2
+```
+
+⚠️ **Importante**: Em produção, altere o `JWT_SECRET` para uma chave segura e única.
+
+### Rotas Protegidas por Perfil
+
+| Rota | Perfil Necessário | Descrição |
+|------|------------------|-----------|
+| `/admin` | admin | Painel administrativo |
+| `/cliente` | client | Dashboard do cliente |
+| `/parceiro` | partner | Portal do parceiro |
+| `/backoffice` | backoffice | Ferramentas de backoffice |
+| `/api/admin/*` | admin | Endpoints administrativos |
+| `/api/client/*` | client | Endpoints do cliente |
+| `/api/partner/*` | partner | Endpoints do parceiro |
+| `/api/backoffice/*` | backoffice | Endpoints do backoffice |
+
+### Logout e Segurança
+
+- **Logout**: Remove token do localStorage e redireciona para login
+- **Expiração**: Tokens expiram automaticamente em 2 horas
+- **Validação**: Tokens inválidos ou expirados resultam em logout automático
+- **CORS**: Configurado para permitir requisições do frontend
+

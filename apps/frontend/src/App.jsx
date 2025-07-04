@@ -1,32 +1,126 @@
-import './App.css'
+import React, { useEffect, useState } from 'react';
+import './App.css';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import AdminDashboard from './pages/AdminDashboard';
+import ClientDashboard from './pages/ClientDashboard';
+
+// Componente de roteamento simples
+const Router = () => {
+  const [currentPath, setCurrentPath] = useState(window.location.pathname);
+  const { isAuthenticated, loading } = useAuth();
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Mostrar loading enquanto verifica autenticação
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando ORBIT IA...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Roteamento baseado no caminho atual
+  switch (currentPath) {
+    case '/login':
+      return <Login />;
+    
+    case '/admin':
+      return <AdminDashboard />;
+    
+    case '/cliente':
+      return <ClientDashboard />;
+    
+    case '/parceiro':
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center bg-white p-8 rounded-lg shadow-lg">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Portal do Parceiro</h1>
+            <p className="text-gray-600 mb-4">Dashboard do parceiro em desenvolvimento</p>
+            <a href="/dashboard" className="text-blue-600 hover:text-blue-800">Voltar ao Dashboard</a>
+          </div>
+        </div>
+      );
+    
+    case '/backoffice':
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center bg-white p-8 rounded-lg shadow-lg">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Backoffice</h1>
+            <p className="text-gray-600 mb-4">Dashboard do backoffice em desenvolvimento</p>
+            <a href="/dashboard" className="text-blue-600 hover:text-blue-800">Voltar ao Dashboard</a>
+          </div>
+        </div>
+      );
+    
+    case '/dashboard':
+      return <Dashboard />;
+    
+    case '/profile':
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center bg-white p-8 rounded-lg shadow-lg">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Meu Perfil</h1>
+            <p className="text-gray-600 mb-4">Página de perfil em desenvolvimento</p>
+            <a href="/dashboard" className="text-blue-600 hover:text-blue-800">Voltar ao Dashboard</a>
+          </div>
+        </div>
+      );
+    
+    case '/settings':
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center bg-white p-8 rounded-lg shadow-lg">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Configurações</h1>
+            <p className="text-gray-600 mb-4">Página de configurações em desenvolvimento</p>
+            <a href="/dashboard" className="text-blue-600 hover:text-blue-800">Voltar ao Dashboard</a>
+          </div>
+        </div>
+      );
+    
+    case '/help':
+      return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+          <div className="text-center bg-white p-8 rounded-lg shadow-lg">
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Ajuda</h1>
+            <p className="text-gray-600 mb-4">Documentação e suporte em desenvolvimento</p>
+            <a href="/dashboard" className="text-blue-600 hover:text-blue-800">Voltar ao Dashboard</a>
+          </div>
+        </div>
+      );
+    
+    case '/':
+    default:
+      // Se não estiver autenticado, redirecionar para login
+      if (!isAuthenticated()) {
+        window.location.href = '/login';
+        return null;
+      }
+      // Se estiver autenticado, redirecionar para dashboard
+      window.location.href = '/dashboard';
+      return null;
+  }
+};
 
 function App() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-purple-900 to-indigo-900 flex items-center justify-center">
-      <div className="text-center">
-        <div className="mb-8">
-          <h1 className="text-6xl font-bold text-white mb-4">
-            🚀 ORBIT IA
-          </h1>
-          <div className="w-24 h-1 bg-gradient-to-r from-blue-400 to-purple-400 mx-auto mb-6"></div>
-          <p className="text-2xl text-blue-200 font-light">
-            está online
-          </p>
-        </div>
-        
-        <div className="bg-white/10 backdrop-blur-sm rounded-lg p-6 border border-white/20">
-          <p className="text-white/80 text-lg">
-            Sistema inicializado com sucesso
-          </p>
-          <div className="flex items-center justify-center mt-4">
-            <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse mr-2"></div>
-            <span className="text-green-400 font-medium">Status: Ativo</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+    <AuthProvider>
+      <Router />
+    </AuthProvider>
+  );
 }
 
-export default App
+export default App;
 
