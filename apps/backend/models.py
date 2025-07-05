@@ -24,3 +24,22 @@ class User(Base):
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', role='{self.role}')>"
 
+
+class Document(Base):
+    """Modelo de documento processado pela IA Wu3"""
+    __tablename__ = "documents"
+    
+    id = Column(String, primary_key=True, index=True)  # UUID
+    user_id = Column(Integer, nullable=False)  # FK para users
+    document_type = Column(String, nullable=False)  # contract, invoice, etc.
+    original_filename = Column(String, nullable=False)
+    file_path = Column(String, nullable=False)
+    extracted_data = Column(String, nullable=True)  # JSON como string
+    confidence_score = Column(String, nullable=True)  # Float como string
+    status = Column(String, default='processing')  # processing, complete, error
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    
+    def __repr__(self):
+        return f"<Document(id='{self.id}', filename='{self.original_filename}', status='{self.status}')>"
+

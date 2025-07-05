@@ -8,6 +8,15 @@ Bem-vindo ao **ORBIT IA**, um monorepositório moderno e escalável para desenvo
 orbit/
 ├── apps/                    # Aplicações principais
 │   ├── frontend/           # Aplicação frontend (React + Vite)
+│   │   ├── src/
+│   │   │   ├── components/
+│   │   │   │   ├── common/     # Componentes reutilizáveis
+│   │   │   │   ├── admin/      # Componentes específicos do admin
+│   │   │   │   ├── client/     # Componentes específicos do cliente
+│   │   │   │   ├── partner/    # Componentes específicos do parceiro
+│   │   │   │   └── backoffice/ # Componentes específicos do backoffice
+│   │   │   ├── pages/          # Páginas da aplicação
+│   │   │   └── contexts/       # Contextos React (AuthContext)
 │   └── backend/            # Aplicação backend (FastAPI + PostgreSQL)
 ├── packages/               # Pacotes compartilhados
 ├── .github/workflows/      # Workflows de CI/CD
@@ -25,6 +34,7 @@ O ORBIT IA é um sistema completo que integra:
 - **Frontend**: Interface de usuário moderna e responsiva (React + Tailwind CSS)
 - **Backend**: API robusta e escalável (FastAPI + Python + PostgreSQL)
 - **Autenticação**: Sistema JWT com perfis de usuário (admin, cliente, parceiro, backoffice)
+- **Dashboards**: Painéis específicos para cada perfil de usuário
 - **Banco de Dados**: PostgreSQL para persistência de dados
 - **Cache**: Redis para cache e sessões
 - **Packages**: Bibliotecas e utilitários compartilhados
@@ -36,6 +46,7 @@ O ORBIT IA é um sistema completo que integra:
 - **Tailwind CSS** para estilização
 - **Context API** para gerenciamento de estado
 - **Lucide Icons** para ícones
+- **Componentes modulares** e reutilizáveis
 
 ### Backend
 - **FastAPI** (Python)
@@ -82,6 +93,32 @@ docker-compose up --build
 - **Backend**: http://localhost:8000
 - **API Docs**: http://localhost:8000/docs
 
+## 🎨 Dashboards por Perfil
+
+### 👑 Administrador (`/admin`)
+- **Estatísticas do Sistema**: Total de usuários, usuários ativos, sessões ativas
+- **Gerenciamento de Usuários**: Lista completa com ações de edição
+- **Ações Rápidas**: Gerenciar usuários, configurações, relatórios
+- **Monitoramento**: Status do sistema e logs de atividade
+
+### 👤 Cliente (`/cliente`)
+- **Projetos**: Visualização e gestão de projetos de análise
+- **Documentos**: Upload e processamento de documentos corporativos
+- **Estatísticas Pessoais**: Projetos ativos, análises concluídas
+- **Atividade Recente**: Histórico de ações e uploads
+
+### 🤝 Parceiro (`/parceiro`)
+- **Gestão de Clientes**: Carteira de clientes e relacionamentos
+- **Propostas Comerciais**: Criação e acompanhamento de propostas
+- **Métricas de Vendas**: Receita, conversão, performance
+- **Pipeline**: Acompanhamento de oportunidades
+
+### ⚙️ Backoffice (`/backoffice`)
+- **Aprovações Pendentes**: Validação de clientes e documentos
+- **Suporte Técnico**: Gestão de tickets e atendimento
+- **Monitoramento**: Saúde do sistema e métricas operacionais
+- **Atividade do Sistema**: Logs e auditoria de ações
+
 ## 🔐 Sistema de Autenticação
 
 ### Perfis de Usuário
@@ -94,6 +131,13 @@ docker-compose up --build
 - `POST /api/login` - Login com email e senha
 - `POST /api/user/register` - Registro de novo usuário
 - `GET /api/user/profile` - Perfil do usuário autenticado
+
+### Roteamento Automático
+O sistema redireciona automaticamente cada usuário para seu dashboard específico após o login:
+- **Admin** → `/admin`
+- **Cliente** → `/cliente`
+- **Parceiro** → `/parceiro`
+- **Backoffice** → `/backoffice`
 
 ### Usuários de Demonstração
 Para testes, você pode criar usuários com os seguintes dados:
@@ -181,9 +225,17 @@ cd apps/frontend
 npm test
 ```
 
-## 📦 Estrutura de Dados
+## 📦 Estrutura de Componentes
 
-### Modelo User
+### Componentes Comuns
+- **DashboardLayout**: Layout base para todos os dashboards
+- **StatsCard**: Card de estatísticas reutilizável
+- **ActionCard**: Card de ação com botão
+- **PrivateRoute**: Proteção de rotas por perfil
+
+### Estrutura de Dados
+
+#### Modelo User
 ```sql
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
@@ -204,12 +256,42 @@ CREATE TABLE users (
 - CORS configurado para desenvolvimento
 - Validação de dados com Pydantic
 - Proteção de rotas por perfil de usuário
+- Roteamento automático baseado em roles
 
 ## 📚 Documentação da API
 
 A documentação interativa da API está disponível em:
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
+
+## 🎨 Design System
+
+### Cores por Perfil
+- **Admin**: Roxo (`purple-600`)
+- **Cliente**: Azul (`blue-600`)
+- **Parceiro**: Verde (`green-600`)
+- **Backoffice**: Laranja (`orange-600`)
+
+### Componentes Tailwind
+- Layout responsivo com `grid` e `flexbox`
+- Cards com `shadow` e `border-radius`
+- Estados hover e focus bem definidos
+- Tipografia consistente e hierárquica
+
+## 🚀 Próximas Funcionalidades
+
+### Etapa 7 - Upload de Documentos + IA Wu3
+- Sistema de upload de documentos corporativos
+- Processamento automático com IA
+- Análise e extração de insights
+- Visualização de resultados nos dashboards
+
+### Funcionalidades Futuras
+- **Notificações em tempo real** com WebSockets
+- **Sistema de auditoria** completo
+- **Relatórios avançados** com gráficos
+- **Integração com APIs externas**
+- **Sistema de backup** automático
 
 ## 🤝 Contribuição
 
