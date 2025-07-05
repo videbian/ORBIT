@@ -1,18 +1,27 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 import DashboardLayout from '../components/common/DashboardLayout';
 import StatsCard from '../components/common/StatsCard';
 import ActionCard from '../components/common/ActionCard';
 import DocumentUpload from '../components/common/DocumentUpload';
 import DocumentList from '../components/common/DocumentList';
-import { useAuth } from '../contexts/AuthContext';
+import useRealtimeUpdates from '../hooks/useRealtimeUpdates';
 
 const ClientDashboard = () => {
   const { user, authenticatedFetch } = useAuth();
   const [dashboardData, setDashboardData] = useState(null);
-  const [documentStats, setDocumentStats] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Hook para atualizações em tempo real
+  const { isConnected } = useRealtimeUpdates((documentData) => {
+    // Callback chamado quando documento é atualizado via WebSocket
+    console.log('Documento atualizado via WebSocket:', documentData);
+    
+    // Atualizar lista de documentos
+    setRefreshTrigger(prev => prev + 1);
+  });
 
   useEffect(() => {
     const fetchDashboardData = async () => {

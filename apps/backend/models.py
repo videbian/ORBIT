@@ -45,6 +45,10 @@ class Document(Base):
     processing_time_seconds = Column(String, nullable=True)  # Tempo de processamento
     wu3_version = Column(String, nullable=True)  # Versão do modelo Wu3 usado
     
+    # Campos específicos para webhooks
+    webhook_received = Column(Boolean, default=False)  # Se webhook foi recebido
+    webhook_received_at = Column(DateTime(timezone=True), nullable=True)  # Quando webhook foi recebido
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

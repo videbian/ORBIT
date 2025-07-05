@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import './App.css';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
+import { NotificationProvider } from './contexts/NotificationContext';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -107,7 +107,9 @@ const Router = () => {
 function App() {
   return (
     <AuthProvider>
-      <Router />
+      <NotificationProvider>
+        <Router />
+      </NotificationProvider>
     </AuthProvider>
   );
 }

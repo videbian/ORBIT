@@ -1,6 +1,6 @@
 # 🚀 ORBIT IA - Monorepositório
 
-Plataforma inteligente de análise de documentos corporativos com IA Wu3, autenticação JWT, dashboards personalizados por perfil e sistema completo de upload e processamento de documentos.
+Plataforma inteligente de análise de documentos corporativos com **integração real da IA Wu3**, autenticação JWT, dashboards personalizados por perfil e sistema completo de upload e processamento de documentos.
 
 ## 📋 **Funcionalidades Implementadas**
 
@@ -21,36 +21,48 @@ Plataforma inteligente de análise de documentos corporativos com IA Wu3, autent
 
 ### 📄 **Sistema de Upload e Processamento de Documentos**
 - **Upload inteligente** com drag-and-drop
-- **Processamento automático** pela IA Wu3 (mockada)
+- **Processamento automático** pela IA Wu3 (real + fallback)
 - **Suporte a múltiplos formatos**: PDF, JPG, PNG, DOCX, DOC
 - **Validação de arquivos** (tipo e tamanho até 10MB)
 - **Extração de dados estruturados** com scores de confiança
 - **Visualização completa** dos resultados processados
 
-### 🤖 **Integração com IA Wu3 (Mockada)**
-- **Processamento por tipo de documento**: contratos, notas fiscais, identidades, etc.
-- **Extração de dados realistas**: CNPJ, razão social, valores, datas, etc.
-- **Scores de confiança** entre 75% e 99%
-- **Metadados de processamento**: tempo, versão do modelo, etc.
-- **Estrutura preparada** para integração real com API Wu3
+### 🤖 **Integração Real com IA Wu3**
+- **Cliente Wu3 completo** com autenticação via token
+- **Fallback automático** para modo mock quando API não configurada
+- **Retry automático** com backoff exponencial para rate limits
+- **Tratamento robusto de erros** (401, 413, 429, etc.)
+- **Monitoramento de status** da configuração Wu3
+- **Processamento assíncrono** preparado para webhooks
+
+### 🎨 **Interface Visual Avançada**
+- **Cores por score de confiança**: Verde (≥90%), Amarelo (70-89%), Vermelho (<70%)
+- **Badges visuais** com ícones para cada nível de confiança
+- **Indicador de status Wu3** em tempo real
+- **Feedback detalhado** de sucesso e erro
+- **Tooltips informativos** com detalhes técnicos
 
 ## 🏗️ **Arquitetura**
 
 ```
 orbit/
 ├── apps/
-│   ├── backend/                 # FastAPI + PostgreSQL
+│   ├── backend/                 # FastAPI + PostgreSQL + Wu3
 │   │   ├── main.py             # Endpoints principais
 │   │   ├── auth.py             # Autenticação JWT
-│   │   ├── models.py           # Modelos SQLAlchemy
+│   │   ├── models.py           # Modelos SQLAlchemy + campos Wu3
 │   │   ├── database.py         # Configuração do banco
-│   │   ├── wu3_service.py      # Serviço IA Wu3 (mock)
+│   │   ├── wu3_client.py       # Cliente real IA Wu3
+│   │   ├── wu3_service.py      # Serviço mock (fallback)
 │   │   ├── migrations/         # Migrations Alembic
 │   │   └── uploads/            # Arquivos enviados
 │   └── frontend/               # React + Tailwind CSS
 │       ├── src/
 │       │   ├── components/
 │       │   │   ├── common/     # Componentes reutilizáveis
+│       │   │   │   ├── Wu3StatusIndicator.jsx
+│       │   │   │   ├── DocumentUpload.jsx
+│       │   │   │   └── DocumentList.jsx
 │       │   │   ├── admin/      # Específicos do admin
 │       │   │   ├── client/     # Específicos do cliente
 │       │   │   ├── partner/    # Específicos do parceiro
@@ -69,6 +81,7 @@ orbit/
 - Node.js 20+
 - PostgreSQL 12+
 - Git
+- **Token da IA Wu3** (opcional - usa fallback se não configurado)
 
 ### **1. Configurar Backend**
 
@@ -86,6 +99,8 @@ sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE orbit TO orbit;"
 
 # Configurar variáveis de ambiente
 export DATABASE_URL="postgresql://orbit:orbit@localhost:5432/orbit"
+export WU3_API_URL="https://api.wu3.ai/process"
+export WU3_API_KEY="seu_token_real_wu3_aqui"  # Opcional
 
 # Executar migrations
 alembic upgrade head
@@ -153,6 +168,36 @@ Senha: backoffice123
 - `GET /api/documents/stats` - Estatísticas de documentos
 - `GET /api/documents/types` - Tipos suportados
 
+### **IA Wu3**
+- `GET /api/wu3/status` - Status da configuração Wu3
+- `GET /api/wu3/document/{wu3_document_id}/status` - Status de documento na Wu3
+
+## 🤖 **Configuração da IA Wu3**
+
+### **Modo Produção (API Real)**
+```env
+WU3_API_URL=https://api.wu3.ai/process
+WU3_API_KEY=seu_token_real_wu3_aqui
+WU3_TIMEOUT_SECONDS=30
+WU3_MAX_RETRIES=3
+WU3_RETRY_DELAY=2
+```
+
+### **Modo Desenvolvimento (Fallback)**
+```env
+# Deixar WU3_API_KEY vazio ou com valor de exemplo
+WU3_API_KEY=seu_token_real_wu3_aqui
+```
+
+### **Funcionalidades do Cliente Wu3**
+- ✅ **Autenticação** via Bearer token
+- ✅ **Retry automático** com backoff exponencial
+- ✅ **Rate limit handling** (HTTP 429)
+- ✅ **Timeout configurável** (padrão 30s)
+- ✅ **Fallback para mock** quando API não disponível
+- ✅ **Validação de configuração** em tempo real
+- ✅ **Logs detalhados** para debugging
+
 ## 🎯 **Tipos de Documento Suportados**
 
 | Tipo | Descrição | Dados Extraídos |
@@ -170,12 +215,25 @@ Senha: backoffice123
 
 ### **Variáveis de Ambiente (.env)**
 ```env
+# Database
 DATABASE_URL=postgresql://orbit:orbit@localhost:5432/orbit
+
+# Authentication
 JWT_SECRET=orbit-ia-secret-key-2024-change-in-production
 JWT_ALGORITHM=HS256
 JWT_EXPIRATION_HOURS=2
-WU3_API_KEY=dummy
+
+# IA Wu3
+WU3_API_URL=https://api.wu3.ai/process
+WU3_API_KEY=seu_token_real_wu3_aqui
+WU3_TIMEOUT_SECONDS=30
+WU3_MAX_RETRIES=3
+WU3_RETRY_DELAY=2
+
+# Storage
 STORAGE_PATH=./uploads
+MAX_FILE_SIZE_MB=10
+ALLOWED_EXTENSIONS=.pdf,.jpg,.jpeg,.png,.docx,.doc
 ```
 
 ### **Estrutura do Banco de Dados**
@@ -192,7 +250,7 @@ CREATE TABLE users (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
--- Tabela de documentos
+-- Tabela de documentos (com campos Wu3)
 CREATE TABLE documents (
     id VARCHAR PRIMARY KEY,
     user_id INTEGER REFERENCES users(id),
@@ -202,7 +260,16 @@ CREATE TABLE documents (
     extracted_data VARCHAR,
     confidence_score VARCHAR,
     status VARCHAR DEFAULT 'processing',
-    created_at TIMESTAMP DEFAULT NOW()
+    
+    -- Campos específicos Wu3
+    wu3_document_id VARCHAR,
+    wu3_request_id VARCHAR,
+    error_message VARCHAR,
+    processing_time_seconds VARCHAR,
+    wu3_version VARCHAR,
+    
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
 );
 ```
 
@@ -222,29 +289,41 @@ curl -X POST "http://localhost:8000/api/documents/upload" \
   -F "file=@documento.pdf" \
   -F "document_type=contract"
 
-# Listar documentos
+# Verificar status Wu3
 curl -H "Authorization: Bearer $TOKEN" \
-  "http://localhost:8000/api/documents"
+  "http://localhost:8000/api/wu3/status"
+```
+
+### **Resposta de Upload Bem-sucedido**
+```json
+{
+  "status": "success",
+  "document_id": "uuid-do-documento",
+  "message": "Documento processado com sucesso",
+  "extracted_data": {
+    "cnpj": "12.345.678/0001-90",
+    "razao_social": "Empresa Digital Offshore Ltda",
+    "valor_contrato": "R$ 250.000,00"
+  },
+  "confidence_score": 0.924,
+  "wu3_document_id": "wu3_uuid-do-documento",
+  "processing_time": 0.64
+}
 ```
 
 ## 📈 **Próximas Funcionalidades**
 
-### **Etapa 8 - Integração Real com IA Wu3**
-- [ ] Conectar com API real da IA Wu3
-- [ ] Implementar autenticação com tokens Wu3
-- [ ] Processar documentos em tempo real
-- [ ] Melhorar precisão da extração
-
-### **Etapa 9 - Notificações em Tempo Real**
-- [ ] WebSockets para status de processamento
+### **Etapa 9 - Webhooks e Notificações em Tempo Real**
+- [ ] Recebimento de webhooks da Wu3
+- [ ] WebSockets para status em tempo real
 - [ ] Notificações push no dashboard
-- [ ] Emails de conclusão de análise
+- [ ] Fila de processamento com Celery
 
 ### **Etapa 10 - Relatórios Avançados**
 - [ ] Gráficos de análise temporal
 - [ ] Exportação em PDF/Excel
 - [ ] Dashboards executivos
-- [ ] Métricas de performance
+- [ ] Métricas de performance Wu3
 
 ### **Etapa 11 - Auditoria e Compliance**
 - [ ] Log de todas as ações
@@ -260,6 +339,21 @@ curl -H "Authorization: Bearer $TOKEN" \
 - **Proteção de rotas** por perfil de usuário
 - **CORS configurado** para frontend
 - **Sanitização de dados** de entrada
+- **Rate limiting** na integração Wu3
+- **Retry seguro** com backoff exponencial
+
+## 🎨 **Interface Visual**
+
+### **Cores por Score de Confiança**
+- 🟢 **Verde (≥90%)**: Alta confiança - dados muito confiáveis
+- 🟡 **Amarelo (70-89%)**: Média confiança - revisar dados importantes
+- 🔴 **Vermelho (<70%)**: Baixa confiança - verificação manual necessária
+
+### **Indicadores Visuais**
+- ✅ **IA Wu3 Conectada**: API configurada e funcionando
+- ⚠️ **Modo Fallback (Mock)**: Usando processamento simulado
+- 🔄 **Processando**: Documento sendo analisado
+- ❌ **Erro**: Falha no processamento
 
 ## 📝 **Licença**
 
@@ -281,5 +375,5 @@ Para suporte técnico ou dúvidas sobre o projeto, entre em contato com a equipe
 
 ---
 
-**🚀 ORBIT IA - Transformando documentos em inteligência empresarial!**
+**🚀 ORBIT IA - Transformando documentos em inteligência empresarial com IA Wu3!**
 

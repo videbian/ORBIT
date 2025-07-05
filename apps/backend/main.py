@@ -1,10 +1,11 @@
-from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File, Form
+from fastapi import FastAPI, HTTPException, Depends, status, UploadFile, File, Form, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
 import os
 import uuid
 import json
+import logging
 from datetime import datetime
 import asyncio
 
@@ -16,6 +17,10 @@ from auth import (
     verify_admin, get_user_by_email
 )
 from wu3_client import wu3_client
+
+# Configurar logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="ORBIT IA Backend", 
@@ -428,4 +433,130 @@ async def get_wu3_document_status(
         return status
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao consultar status: {str(e)}")
+
+
+# Endpoint de webhook Wu3
+@app.post("/api/webhooks/wu3")
+async def receive_wu3_webhook(request: Request, db: Session = Depends(get_db)):
+    """
+    Recebe notificação de processamento da IA Wu3
+    """
+    from webhook_service import WebhookProcessor
+    
+    try:
+        # Obter payload JSON
+        payload = await request.json()
+        
+        # Processar webhook
+        processor = WebhookProcessor(db)
+        result = await processor.process_wu3_webhook(request, payload)
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Erro ao processar webhook Wu3: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro interno: {str(e)}")
+
+@app.get("/api/webhooks/wu3/test")
+async def test_webhook_endpoint():
+    """
+    Endpoint de teste para verificar se webhooks estão funcionando
+    """
+    from webhook_service import webhook_validator
+    
+    return {
+        "webhook_endpoint": "/api/webhooks/wu3",
+        "webhook_secret_configured": bool(webhook_validator.webhook_secret),
+        "allowed_ips": webhook_validator.allowed_ips,
+        "environment": os.getenv("ENVIRONMENT", "development"),
+        "message": "Endpoint de webhook Wu3 ativo e configurado"
+    }
+
+
+# WebSocket para notificações em tempo real
+@app.websocket("/ws/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    """
+    Endpoint WebSocket para notificações em tempo real
+    """
+    from websocket_manager import websocket_manager
+    
+    await websocket_manager.connect(websocket, user_id)
+    
+    try:
+        while True:
+            # Manter conexão viva e escutar mensagens do cliente
+            data = await websocket.receive_text()
+            
+            # Processar mensagens do cliente se necessário
+            try:
+                message = json.loads(data)
+                
+                if message.get('type') == 'ping':
+                    # Responder a ping com pong
+                    await websocket_manager.send_personal_message({
+                        'type': 'pong',
+                        'timestamp': datetime.utcnow().isoformat()
+                    }, user_id)
+                
+                elif message.get('type') == 'request_stats':
+                    # Enviar estatísticas de conexão
+                    stats = websocket_manager.get_connection_stats()
+                    await websocket_manager.send_personal_message({
+                        'type': 'connection_stats',
+                        'data': stats,
+                        'timestamp': datetime.utcnow().isoformat()
+                    }, user_id)
+                
+            except json.JSONDecodeError:
+                logger.warning(f"Mensagem WebSocket inválida recebida do usuário {user_id}: {data}")
+    
+    except WebSocketDisconnect:
+        websocket_manager.disconnect(websocket, user_id)
+        logger.info(f"WebSocket desconectado para usuário {user_id}")
+
+@app.get("/api/websocket/stats")
+async def get_websocket_stats(current_user: User = Depends(get_current_user)):
+    """
+    Retorna estatísticas das conexões WebSocket
+    """
+    from websocket_manager import websocket_manager
+    
+    stats = websocket_manager.get_connection_stats()
+    
+    return {
+        'websocket_stats': stats,
+        'current_user_connected': str(current_user.id) in websocket_manager.active_connections,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+
+@app.post("/api/websocket/test-notification")
+async def test_websocket_notification(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Endpoint de teste para enviar notificação WebSocket
+    """
+    from websocket_manager import websocket_manager
+    
+    # Enviar notificação de teste
+    test_notification = {
+        'type': 'test_notification',
+        'message': 'Esta é uma notificação de teste do sistema ORBIT IA',
+        'data': {
+            'test': True,
+            'user_id': current_user.id,
+            'user_name': current_user.name
+        },
+        'timestamp': datetime.utcnow().isoformat()
+    }
+    
+    await websocket_manager.send_personal_message(test_notification, str(current_user.id))
+    
+    return {
+        'success': True,
+        'message': 'Notificação de teste enviada',
+        'user_id': current_user.id
+    }
 
