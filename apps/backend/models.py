@@ -36,7 +36,15 @@ class Document(Base):
     file_path = Column(String, nullable=False)
     extracted_data = Column(String, nullable=True)  # JSON como string
     confidence_score = Column(String, nullable=True)  # Float como string
-    status = Column(String, default='processing')  # processing, complete, error
+    status = Column(String, default='processing')  # processing, complete, error, failed
+    
+    # Campos específicos para integração Wu3
+    wu3_document_id = Column(String, nullable=True)  # ID retornado pela Wu3
+    wu3_request_id = Column(String, nullable=True)  # ID da requisição Wu3
+    error_message = Column(String, nullable=True)  # Mensagem de erro se houver
+    processing_time_seconds = Column(String, nullable=True)  # Tempo de processamento
+    wu3_version = Column(String, nullable=True)  # Versão do modelo Wu3 usado
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     

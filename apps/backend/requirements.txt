@@ -20,3 +20,7 @@ psycopg2-binary==2.9.9
 alembic==1.13.1
 passlib[bcrypt]==1.7.4
 
+
+aiohttp==3.9.1
+aiofiles==23.2.1
+

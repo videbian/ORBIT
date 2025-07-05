@@ -46,11 +46,25 @@ const ClientDashboard = () => {
   const handleUploadSuccess = (result) => {
     setShowUpload(false);
     setRefreshTrigger(prev => prev + 1);
-    alert(`Documento processado com sucesso! Confiança: ${(result.confidence_score * 100).toFixed(1)}%`);
+    
+    // Feedback mais detalhado
+    const message = `✅ Documento processado com sucesso!\n\n` +
+      `📊 Confiança: ${result.confidence_percentage}%\n` +
+      `⏱️ Tempo: ${result.processing_time}s\n` +
+      `🤖 Status: ${result.status === 'success' ? 'Concluído' : result.status}`;
+    
+    alert(message);
   };
 
   const handleUploadError = (error) => {
-    alert(`Erro no upload: ${error}`);
+    // Feedback de erro mais amigável
+    const message = `❌ Erro no processamento do documento:\n\n${error}\n\n` +
+      `💡 Dicas:\n` +
+      `• Verifique se o arquivo não está corrompido\n` +
+      `• Certifique-se de que o tipo é suportado (PDF, JPG, PNG, DOCX)\n` +
+      `• Tente novamente em alguns minutos`;
+    
+    alert(message);
   };
 
   if (loading) {

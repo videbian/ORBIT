@@ -6,6 +6,7 @@ import os
 import uuid
 import json
 from datetime import datetime
+import asyncio
 
 from database import get_db, create_tables
 from models import User, Document
@@ -14,7 +15,7 @@ from auth import (
     authenticate_user, create_access_token, get_current_user, create_user,
     verify_admin, get_user_by_email
 )
-from wu3_service import process_document_with_wu3
+from wu3_client import wu3_client
 
 app = FastAPI(
     title="ORBIT IA Backend", 
@@ -226,29 +227,53 @@ async def upload_document(
     db.commit()
     db.refresh(document)
     
-    # Processar documento com IA Wu3 (assíncrono/mockado)
+    # Processar documento com IA Wu3 real
     try:
-        result = process_document_with_wu3(document_id, file_path, document_type)
+        # Usar cliente Wu3 real (com fallback para mock se não configurado)
+        wu3_result = await wu3_client.process_document(file_path, document_type, document_id)
         
-        # Atualizar documento com resultado
-        document.extracted_data = json.dumps(result['extracted_data'])
-        document.confidence_score = str(result['confidence_score'])
-        document.status = 'complete'
+        # Atualizar documento com resultado da Wu3
+        document.extracted_data = json.dumps(wu3_result.get('extracted_data', {}))
+        document.confidence_score = str(wu3_result.get('confidence_score', 0.0))
+        document.status = wu3_result.get('status', 'complete')
+        document.wu3_document_id = wu3_result.get('wu3_document_id')
+        document.wu3_request_id = wu3_result.get('wu3_request_id')
+        document.error_message = wu3_result.get('error_message')
+        document.processing_time_seconds = str(wu3_result.get('processing_time_seconds', 0.0))
+        document.wu3_version = wu3_result.get('wu3_version')
         
         db.commit()
+        
+        # Se houve erro no processamento Wu3
+        if wu3_result.get('status') == 'failed':
+            return {
+                "status": "failed",
+                "document_id": document_id,
+                "message": f"Erro no processamento: {wu3_result.get('error_message', 'Erro desconhecido')}",
+                "error_message": wu3_result.get('error_message')
+            }
+        
+        # Sucesso
+        return {
+            "status": "success",
+            "document_id": document_id,
+            "message": "Documento processado com sucesso",
+            "extracted_data": wu3_result.get('extracted_data', {}),
+            "confidence_score": wu3_result.get('confidence_score', 0.0),
+            "wu3_document_id": wu3_result.get('wu3_document_id'),
+            "processing_time": wu3_result.get('processing_time_seconds', 0.0)
+        }
         
     except Exception as e:
-        document.status = 'error'
+        # Em caso de erro, atualizar status no banco
+        document.status = 'failed'
+        document.error_message = str(e)
         db.commit()
-        raise HTTPException(status_code=500, detail=f"Erro no processamento: {str(e)}")
-    
-    return {
-        "status": "success",
-        "document_id": document_id,
-        "message": "Documento processado com sucesso",
-        "extracted_data": result['extracted_data'],
-        "confidence_score": result['confidence_score']
-    }
+        
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Erro no processamento: {str(e)}"
+        )
 
 @app.get("/api/documents")
 async def list_documents(
@@ -372,4 +397,35 @@ async def get_document_stats(
         "by_status": {stat.status: stat.count for stat in stats},
         "by_type": {stat.document_type: stat.count for stat in type_stats}
     }
+
+
+@app.get("/api/wu3/status")
+async def get_wu3_status(current_user: User = Depends(get_current_user)):
+    """
+    Verifica o status da configuração Wu3
+    """
+    is_valid, message = wu3_client.validate_configuration()
+    
+    return {
+        "wu3_configured": is_valid,
+        "message": message,
+        "api_url": wu3_client.base_url,
+        "has_api_key": bool(wu3_client.api_key and wu3_client.api_key != "seu_token_real_wu3_aqui"),
+        "timeout": wu3_client.timeout,
+        "max_retries": wu3_client.max_retries
+    }
+
+@app.get("/api/wu3/document/{wu3_document_id}/status")
+async def get_wu3_document_status(
+    wu3_document_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Consulta status de um documento na Wu3 (para processamento assíncrono)
+    """
+    try:
+        status = await wu3_client.get_document_status(wu3_document_id)
+        return status
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao consultar status: {str(e)}")
 

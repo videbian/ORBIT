@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import Wu3StatusIndicator from './Wu3StatusIndicator';
 
 const DocumentUpload = ({ onUploadSuccess, onUploadError }) => {
   const { authenticatedFetch } = useAuth();
@@ -99,6 +100,11 @@ const DocumentUpload = ({ onUploadSuccess, onUploadError }) => {
 
       const result = await response.json();
       
+      // Verificar se o processamento falhou
+      if (result.status === 'failed') {
+        throw new Error(result.error_message || 'Erro no processamento do documento');
+      }
+      
       // Limpar formulário
       setFile(null);
       setDocumentType('contract');
@@ -106,17 +112,35 @@ const DocumentUpload = ({ onUploadSuccess, onUploadError }) => {
         fileInputRef.current.value = '';
       }
 
-      // Callback de sucesso
+      // Callback de sucesso com informações detalhadas
       if (onUploadSuccess) {
-        onUploadSuccess(result);
+        onUploadSuccess({
+          ...result,
+          confidence_percentage: result.confidence_score ? (result.confidence_score * 100).toFixed(1) : 'N/A',
+          processing_time: result.processing_time || 'N/A'
+        });
       }
 
     } catch (error) {
       console.error('Erro no upload:', error);
+      
+      // Determinar tipo de erro para melhor feedback
+      let errorMessage = error.message;
+      
+      if (error.message.includes('Rate limit')) {
+        errorMessage = 'Muitas requisições. Tente novamente em alguns minutos.';
+      } else if (error.message.includes('Token')) {
+        errorMessage = 'Erro de autenticação. Faça login novamente.';
+      } else if (error.message.includes('muito grande')) {
+        errorMessage = 'Arquivo muito grande. Tamanho máximo: 10MB.';
+      } else if (error.message.includes('não suportado')) {
+        errorMessage = 'Tipo de arquivo não suportado. Use PDF, JPG, PNG ou DOCX.';
+      }
+      
       if (onUploadError) {
-        onUploadError(error.message);
+        onUploadError(errorMessage);
       } else {
-        alert(`Erro no upload: ${error.message}`);
+        alert(`Erro no upload: ${errorMessage}`);
       }
     } finally {
       setUploading(false);
@@ -140,7 +164,10 @@ const DocumentUpload = ({ onUploadSuccess, onUploadError }) => {
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Upload de Documento</h3>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-medium text-gray-900">Upload de Documento</h3>
+        <Wu3StatusIndicator />
+      </div>
       
       {/* Seletor de tipo de documento */}
       <div className="mb-4">
