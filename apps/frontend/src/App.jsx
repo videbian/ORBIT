@@ -6,6 +6,8 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import AdminDashboard from './pages/AdminDashboard';
 import ClientDashboard from './pages/ClientDashboard';
+import PartnerDashboard from './pages/PartnerDashboard';
+import BackofficeDashboard from './pages/BackofficeDashboard';
 
 // Componente de roteamento simples
 const Router = () => {
@@ -48,26 +50,10 @@ const Router = () => {
       return <ClientDashboard />;
     
     case '/parceiro':
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center bg-white p-8 rounded-lg shadow-lg">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Portal do Parceiro</h1>
-            <p className="text-gray-600 mb-4">Dashboard do parceiro em desenvolvimento</p>
-            <a href="/dashboard" className="text-blue-600 hover:text-blue-800">Voltar ao Dashboard</a>
-          </div>
-        </div>
-      );
+      return <PartnerDashboard />;
     
     case '/backoffice':
-      return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-          <div className="text-center bg-white p-8 rounded-lg shadow-lg">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Backoffice</h1>
-            <p className="text-gray-600 mb-4">Dashboard do backoffice em desenvolvimento</p>
-            <a href="/dashboard" className="text-blue-600 hover:text-blue-800">Voltar ao Dashboard</a>
-          </div>
-        </div>
-      );
+      return <BackofficeDashboard />;
     
     case '/dashboard':
       return <Dashboard />;

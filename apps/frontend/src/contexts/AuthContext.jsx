@@ -23,7 +23,7 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true);
       
-      const response = await fetch('http://localhost:8001/api/login', {
+      const response = await fetch('http://localhost:8000/api/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -81,7 +81,7 @@ export const AuthProvider = ({ children }) => {
   // Função para buscar perfil do usuário
   const fetchUserProfile = async (authToken) => {
     try {
-      const response = await fetch('http://localhost:8001/api/user/profile', {
+      const response = await fetch('http://localhost:8000/api/user/profile', {
         headers: {
           'Authorization': `Bearer ${authToken}`,
         },
