@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import InsightsPanel from './InsightsPanel';
 
 const DocumentList = ({ refreshTrigger }) => {
   const { authenticatedFetch } = useAuth();
   const [documents, setDocuments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedDocument, setSelectedDocument] = useState(null);
-  const [showDetails, setShowDetails] = useState(false);
+  const [showInsightsModal, setShowInsightsModal] = useState(false);
 
   const documentTypeLabels = {
     contract: 'Contrato',
@@ -114,6 +115,21 @@ const DocumentList = ({ refreshTrigger }) => {
       console.error('Erro ao carregar detalhes:', error);
       alert('Erro ao carregar detalhes do documento');
     }
+  };
+
+  const openInsightsModal = (document) => {
+    setSelectedDocument(document);
+    setShowInsightsModal(true);
+  };
+
+  const closeInsightsModal = () => {
+    setShowInsightsModal(false);
+    setSelectedDocument(null);
+  };
+
+  const handleInsightsGenerated = (insights) => {
+    // Atualizar lista de documentos após geração de insights
+    fetchDocuments();
   };
 
   const formatDate = (dateString) => {
@@ -264,12 +280,22 @@ const DocumentList = ({ refreshTrigger }) => {
                       {formatDate(document.created_at)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button
-                        onClick={() => handleViewDetails(document.id)}
-                        className="text-blue-600 hover:text-blue-900"
-                      >
-                        Ver Detalhes
-                      </button>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => handleViewDetails(document.id)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          Ver Detalhes
+                        </button>
+                        {document.status === 'complete' && (
+                          <button
+                            onClick={() => openInsightsModal(document)}
+                            className="text-purple-600 hover:text-purple-900"
+                          >
+                            🧠 Insights
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -341,6 +367,42 @@ const DocumentList = ({ refreshTrigger }) => {
             <div className="mt-6 flex justify-end">
               <button
                 onClick={() => setShowDetails(false)}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors duration-200"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de insights */}
+      {showInsightsModal && selectedDocument && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">
+                Insights Inteligentes - {selectedDocument.original_filename}
+              </h3>
+              <button
+                onClick={closeInsightsModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <span className="sr-only">Fechar</span>
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <InsightsPanel 
+              documentId={selectedDocument.id}
+              onInsightsGenerated={handleInsightsGenerated}
+            />
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={closeInsightsModal}
                 className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors duration-200"
               >
                 Fechar

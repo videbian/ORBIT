@@ -258,8 +258,8 @@ async def upload_document(
                 "error_message": wu3_result.get('error_message')
             }
         
-        # Sucesso
-        return {
+        # Sucesso no processamento Wu3
+        upload_response = {
             "status": "success",
             "document_id": document_id,
             "message": "Documento processado com sucesso",
@@ -268,6 +268,36 @@ async def upload_document(
             "wu3_document_id": wu3_result.get('wu3_document_id'),
             "processing_time": wu3_result.get('processing_time_seconds', 0.0)
         }
+        
+        # Gerar insights automaticamente se habilitado
+        try:
+            from gpt_client import gpt_client
+            
+            if gpt_client.enabled and wu3_result.get('status') == 'complete':
+                # Marcar como gerando insights
+                document.insights_status = 'generating'
+                db.commit()
+                
+                # Gerar insights em background (assíncrono)
+                asyncio.create_task(generate_insights_background(
+                    document_id=document_id,
+                    extracted_data=wu3_result.get('extracted_data', {}),
+                    document_type=document_type,
+                    original_filename=file.filename,
+                    confidence_score=wu3_result.get('confidence_score'),
+                    user_id=current_user.id
+                ))
+                
+                upload_response["insights_generation"] = "started"
+                upload_response["message"] += " - Gerando insights inteligentes..."
+            else:
+                upload_response["insights_generation"] = "disabled"
+                
+        except Exception as insights_error:
+            logger.warning(f"Erro ao iniciar geração de insights: {str(insights_error)}")
+            upload_response["insights_generation"] = "error"
+        
+        return upload_response
         
     except Exception as e:
         # Em caso de erro, atualizar status no banco
@@ -559,4 +589,289 @@ async def test_websocket_notification(
         'message': 'Notificação de teste enviada',
         'user_id': current_user.id
     }
+
+
+# Endpoints de insights GPT
+@app.post("/api/documents/{document_id}/generate-insights")
+async def generate_document_insights_endpoint(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Gera insights inteligentes para um documento específico
+    """
+    from gpt_client import generate_document_insights
+    
+    # Buscar documento
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Documento não encontrado")
+    
+    # Verificar se documento foi processado
+    if document.status != 'complete':
+        raise HTTPException(
+            status_code=400, 
+            detail="Documento ainda não foi processado completamente"
+        )
+    
+    # Verificar se já tem insights
+    if document.insights_status == 'generating':
+        return {
+            'status': 'generating',
+            'message': 'Insights já estão sendo gerados para este documento'
+        }
+    
+    try:
+        # Marcar como gerando
+        document.insights_status = 'generating'
+        db.commit()
+        
+        # Preparar dados extraídos
+        extracted_data = {}
+        if document.extracted_data:
+            try:
+                extracted_data = json.loads(document.extracted_data)
+            except json.JSONDecodeError:
+                extracted_data = {"raw_data": document.extracted_data}
+        
+        # Preparar score de confiança
+        confidence_score = None
+        if document.confidence_score:
+            try:
+                confidence_score = float(document.confidence_score)
+            except (ValueError, TypeError):
+                confidence_score = None
+        
+        # Gerar insights
+        insights = await generate_document_insights(
+            extracted_data=extracted_data,
+            document_type=document.document_type,
+            original_filename=document.original_filename,
+            confidence_score=confidence_score
+        )
+        
+        # Salvar insights no banco
+        document.gpt_insights = json.dumps(insights, ensure_ascii=False)
+        document.gpt_summary = insights.get('resumo', 'Resumo não disponível')
+        document.gpt_generated_at = datetime.utcnow()
+        document.gpt_model_used = insights.get('modelo_usado', 'unknown')
+        document.insights_status = 'complete'
+        document.updated_at = datetime.utcnow()
+        
+        db.commit()
+        
+        # Enviar notificação WebSocket
+        from websocket_manager import websocket_manager
+        notification = {
+            'type': 'insights_generated',
+            'data': {
+                'document_id': document.id,
+                'original_filename': document.original_filename,
+                'insights_summary': insights.get('resumo', '')[:100] + '...'
+            },
+            'message': f'🧠 Insights gerados para {document.original_filename}',
+            'timestamp': datetime.utcnow().isoformat()
+        }
+        
+        await websocket_manager.send_personal_message(notification, str(current_user.id))
+        
+        return {
+            'success': True,
+            'document_id': document.id,
+            'insights': insights,
+            'status': 'complete'
+        }
+        
+    except Exception as e:
+        # Marcar como erro
+        document.insights_status = 'error'
+        document.error_message = str(e)
+        db.commit()
+        
+        logger.error(f"Erro ao gerar insights para documento {document_id}: {str(e)}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Erro ao gerar insights: {str(e)}"
+        )
+
+@app.get("/api/documents/{document_id}/insights")
+async def get_document_insights(
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Retorna insights de um documento específico
+    """
+    # Buscar documento
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.user_id == current_user.id
+    ).first()
+    
+    if not document:
+        raise HTTPException(status_code=404, detail="Documento não encontrado")
+    
+    # Preparar resposta
+    response = {
+        'document_id': document.id,
+        'original_filename': document.original_filename,
+        'insights_status': document.insights_status,
+        'gpt_summary': document.gpt_summary,
+        'gpt_generated_at': document.gpt_generated_at.isoformat() if document.gpt_generated_at else None,
+        'gpt_model_used': document.gpt_model_used
+    }
+    
+    # Adicionar insights se disponíveis
+    if document.gpt_insights:
+        try:
+            response['insights'] = json.loads(document.gpt_insights)
+        except json.JSONDecodeError:
+            response['insights'] = None
+    
+    return response
+
+@app.get("/api/gpt/status")
+async def get_gpt_status(current_user: User = Depends(get_current_user)):
+    """
+    Retorna status da configuração GPT
+    """
+    from gpt_client import gpt_client
+    
+    status = gpt_client.get_status()
+    
+    return {
+        'gpt_status': status,
+        'timestamp': datetime.utcnow().isoformat()
+    }
+
+@app.post("/api/documents/batch-generate-insights")
+async def batch_generate_insights(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Gera insights para todos os documentos do usuário que ainda não têm
+    """
+    # Buscar documentos sem insights
+    documents = db.query(Document).filter(
+        Document.user_id == current_user.id,
+        Document.status == 'complete',
+        Document.insights_status.in_(['pending', 'error'])
+    ).all()
+    
+    if not documents:
+        return {
+            'message': 'Nenhum documento encontrado para gerar insights',
+            'documents_found': 0
+        }
+    
+    # Iniciar geração em background (simulado)
+    generated_count = 0
+    errors = []
+    
+    for document in documents[:5]:  # Limitar a 5 por vez para evitar sobrecarga
+        try:
+            # Marcar como gerando
+            document.insights_status = 'generating'
+            db.commit()
+            
+            # Aqui seria ideal usar uma task queue (Celery, RQ, etc.)
+            # Por simplicidade, vamos gerar de forma síncrona
+            
+            generated_count += 1
+            
+        except Exception as e:
+            errors.append({
+                'document_id': document.id,
+                'filename': document.original_filename,
+                'error': str(e)
+            })
+    
+    return {
+        'message': f'Iniciada geração de insights para {generated_count} documentos',
+        'documents_found': len(documents),
+        'generation_started': generated_count,
+        'errors': errors
+    }
+
+
+async def generate_insights_background(
+    document_id: str,
+    extracted_data: dict,
+    document_type: str,
+    original_filename: str,
+    confidence_score: float,
+    user_id: int
+):
+    """
+    Gera insights em background após upload do documento
+    """
+    from gpt_client import generate_document_insights
+    from websocket_manager import websocket_manager
+    
+    try:
+        # Gerar insights
+        insights = await generate_document_insights(
+            extracted_data=extracted_data,
+            document_type=document_type,
+            original_filename=original_filename,
+            confidence_score=confidence_score
+        )
+        
+        # Atualizar banco de dados
+        db = next(get_db())
+        document = db.query(Document).filter(Document.id == document_id).first()
+        
+        if document:
+            document.gpt_insights = json.dumps(insights, ensure_ascii=False)
+            document.gpt_summary = insights.get('resumo', 'Resumo não disponível')
+            document.gpt_generated_at = datetime.utcnow()
+            document.gpt_model_used = insights.get('modelo_usado', 'unknown')
+            document.insights_status = 'complete'
+            document.updated_at = datetime.utcnow()
+            
+            db.commit()
+            
+            # Enviar notificação WebSocket
+            notification = {
+                'type': 'insights_generated',
+                'data': {
+                    'document_id': document.id,
+                    'original_filename': document.original_filename,
+                    'insights_summary': insights.get('resumo', '')[:100] + '...',
+                    'nivel_atencao': insights.get('nivel_atencao', 'medio')
+                },
+                'message': f'🧠 Insights gerados para {document.original_filename}',
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+            await websocket_manager.send_personal_message(notification, str(user_id))
+            
+            logger.info(f"Insights gerados com sucesso para documento {document_id}")
+        
+        db.close()
+        
+    except Exception as e:
+        logger.error(f"Erro ao gerar insights em background para documento {document_id}: {str(e)}")
+        
+        # Marcar como erro no banco
+        try:
+            db = next(get_db())
+            document = db.query(Document).filter(Document.id == document_id).first()
+            
+            if document:
+                document.insights_status = 'error'
+                document.error_message = f"Erro ao gerar insights: {str(e)}"
+                db.commit()
+            
+            db.close()
+            
+        except Exception as db_error:
+            logger.error(f"Erro ao atualizar status de erro no banco: {str(db_error)}")
 

@@ -55,3 +55,12 @@ class Document(Base):
     def __repr__(self):
         return f"<Document(id='{self.id}', filename='{self.original_filename}', status='{self.status}')>"
 
+
+    
+    # Campos específicos para insights GPT
+    gpt_insights = Column(String, nullable=True)  # JSON string com insights gerados
+    gpt_summary = Column(String, nullable=True)   # Resumo em texto simples
+    gpt_generated_at = Column(DateTime(timezone=True), nullable=True)
+    gpt_model_used = Column(String, nullable=True)
+    insights_status = Column(String, default='pending')  # pending, generating, complete, error
+
